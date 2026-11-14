@@ -21,11 +21,13 @@ header h1{font-size:1.3rem}
 .card h3{color:#d9232e;text-align:center;margin-bottom:15px}
 input{width:100%;padding:12px;margin:6px 0 14px;border:1px solid #ccc;border-radius:8px;font-size:1rem}
 .btn{width:100%;padding:14px;background:#d9232e;color:#fff;border:none;border-radius:8px;font-size:1rem;font-weight:bold;cursor:pointer;margin-top:6px}
+.btn:disabled{background:#999}
 .btn-green{background:#27ae60}
 .btn-gold{background:#f1c40f;color:#1a252f}
 .btn-gray{background:#6c757d;font-size:0.85rem;padding:10px;margin-top:12px}
 .lcard{background:#b81d26;color:#fff;padding:20px;border-radius:14px;margin:10px 0;text-align:center;border:3px solid #f1c40f}
 .lcard.vip{background:#b8860b;border:3px solid #fff}
+.id-badge{background:rgba(0,0,0,0.3);display:inline-block;padding:4px 12px;border-radius:20px;font-family:monospace;font-size:1rem;font-weight:bold;color:#f1c40f;margin-top:6px;letter-spacing:2px}
 .vip-msg{background:#fff;color:#8a6d0b;font-weight:bold;padding:8px;border-radius:8px;margin:10px 0;font-size:0.95rem;display:none}
 .pts{font-family:monospace;font-size:2.3rem;font-weight:bold;color:#f1c40f;background:rgba(0,0,0,0.25);padding:10px;border-radius:10px;margin:10px 0}
 .lcard.vip .pts{color:#fff}
@@ -55,65 +57,17 @@ footer{text-align:center;padding:15px;font-size:0.8rem;color:#666}
     <small>* Bodovi i popust se ne primenjuju na cigarete, novine, beli hleb i ostale snizene proizvode.</small>
   </div>
   <div class="card" id="p-reg">
-    <h3>Kreirajte karticu</h3>
+    <h3>Kreirajte ili otvorite karticu</h3>
     <label>Ime i prezime *</label>
     <input type="text" id="ime" placeholder="Unesite ime i prezime">
     <label>Mejl adresa *</label>
     <input type="email" id="mejl" placeholder="vas@mejl.com">
-    <button type="button" class="btn" onclick="kreiraj()">Kreiraj moju karticu</button>
-  </div>
-  <div class="card" id="p-card" style="display:none">
-    <h3>Digitalna kartica</h3>
-    <div class="lcard" id="card-bg">
-      <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:0.85rem">
-        <span>TRGOVINA SNESKA 1</span>
-        <span style="color:#f1c40f" id="c-status">SAKUPLJANJE</span>
-      </div>
-      <div class="vip-msg" id="vip-msg">MOZETE ISKORISTITI POPUST OD 10%!</div>
-      <div class="pts"><span id="c-bodovi">0</span> <small style="font-size:1rem">/ 1000 bod.</small></div>
-      <div class="bar-bg"><div class="bar-fill" id="c-bar"></div></div>
-      <div class="live-box" id="live-clock">--.--.----. --:--:--</div>
-      <div style="text-align:left"><strong id="c-ime"></strong><br><small id="c-mejl"></small></div>
-    </div>
-    <button type="button" class="btn btn-gold" id="btn-popust" style="display:none" onclick="otvoriKasir('popust')">ISKORISTI 10% POPUSTA (Kasir)</button>
-    <button type="button" class="btn btn-green" onclick="otvoriKasir('dodaj')">+ Dodaj bodove (Kasir)</button>
-    <div class="kasir-panel" id="kasir-panel">
-      <h4 id="kasir-naslov" style="margin-bottom:10px;color:#d9232e">Unos bodova</h4>
-      <label>PIN kod kasira:</label>
-      <input type="password" inputmode="numeric" id="k-pin" placeholder="Unesite PIN">
-      <div id="racun-polje">
-        <label>Iznos racuna u dinarima (RSD):</label>
-        <input type="number" id="k-racun" placeholder="npr. 1250">
-      </div>
-      <button type="button" class="btn btn-green" onclick="potvrdiKasir()">Potvrdi</button>
-      <button type="button" class="btn btn-gray" onclick="zatvoriKasir()">Otkazi</button>
-    </div>
-    <button type="button" class="btn btn-gray" onclick="odjava()">Promeni mejl adresu</button>
-  </div>
-  <div class="card" id="p-firma" style="display:none">
-    <h3>Trgovina Sneska</h3>
-    <div class="row"><span>Naziv firme</span><strong>Trgovina Sneska 1</strong></div>
-    <div class="row"><span>PIB</span><strong>107124984</strong></div>
-    <div class="row"><span>Adresa</span><strong>Cara Lazara bb</strong></div>
-    <div class="row"><span>Telefon</span><strong><a href="tel:0641329600" style="color:#27ae60">064 132 9600</a></strong></div>
-    <button type="button" class="btn" onclick="go('kartica')">Nazad</button>
-  </div>
-  <div class="card" id="p-nalog" style="display:none">
-    <h3>Moj nalog</h3>
-    <div id="n-da">
-      <div class="row"><span>Ime i prezime</span><strong id="n-ime"></strong></div>
-      <div class="row"><span>Mejl adresa</span><strong id="n-mejl"></strong></div>
-      <div class="row"><span>Sakupljeni bodovi</span><strong id="n-bodovi" style="color:#d9232e"></strong></div>
-      <button type="button" class="btn btn-gray" onclick="odjava()">Odjavi se</button>
-    </div>
-    <div id="n-ne" style="display:none;text-align:center">
-      <p style="margin-bottom:10px">Niste prijavljeni.</p>
-      <button type="button" class="btn" onclick="go('kartica')">Prijavi se</button>
-    </div>
+    <button type="button" class="btn" id="btn-kreiraj" onclick="kreiraj()">Otvori moju karticu</button>
   </div>
 </div>
-<footer>Trgovina Sneska 1 | PIB: 107124984 | Cara Lazara bb | Verzija 3.1</footer>
+<footer>Trgovina Sneska 1 | PIB: 107124984 | Cara Lazara bb | Verzija 4.1</footer>
 <script>
+var SCRIPT_URL = "https://google.com";
 var u = null;
 var kasirMod = '';
 function dnevniPin() {
@@ -143,6 +97,7 @@ function go(s) {
     document.getElementById('n-da').style.display = u ? 'block' : 'none';
     document.getElementById('n-ne').style.display = u ? 'none' : 'block';
     if (u) {
+      document.getElementById('n-id').textContent = u.cardId || '0000';
       document.getElementById('n-ime').textContent = u.ime;
       document.getElementById('n-mejl').textContent = u.mejl;
       document.getElementById('n-bodovi').textContent = u.bodovi + ' bodova';
@@ -150,27 +105,81 @@ function go(s) {
   }
 }
 function getDb() {
-  try { return JSON.parse(localStorage.getItem('sn_v3_db') || '{}'); } catch (e) { return {}; }
+  try { return JSON.parse(localStorage.getItem('sn_v4_db') || '{}'); } catch (e) { return {}; }
 }
 function setDb(db) {
-  try { localStorage.setItem('sn_v3_db', JSON.stringify(db)); } catch (e) {}
+  try { localStorage.setItem('sn_v4_db', JSON.stringify(db)); } catch (e) {}
+}
+function posaljiUTabelu(k, rsd) {
+  fetch(SCRIPT_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      ime: k.ime,
+      mejl: k.mejl,
+      bodovi: k.bodovi,
+      dodatoRsd: rsd || 0,
+      cardId: k.cardId
+    })
+  }).catch(function() {});
 }
 function kreiraj() {
   var ime = document.getElementById('ime').value.trim();
   var mejl = document.getElementById('mejl').value.trim().toLowerCase();
   if (!ime || mejl.indexOf('@') === -1) { alert('Unesite ime, prezime i ispravan mejl.'); return; }
-  var db = getDb();
-  if (!db[mejl]) {
-    db[mejl] = { ime: ime, mejl: mejl, bodovi: 0 };
-    setDb(db);
-  }
-  try { localStorage.setItem('sn_v3_act', mejl); } catch (e) {}
-  prikazi(db[mejl]);
+  var btn = document.getElementById('btn-kreiraj');
+  btn.disabled = true;
+  btn.textContent = 'Ucitavanje...';
+  fetch(SCRIPT_URL + '?mejl=' + encodeURIComponent(mejl))
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      var db = getDb();
+      if (data && data.found) {
+        db[mejl] = {
+          ime: data.ime || ime,
+          mejl: mejl,
+          bodovi: Number(data.bodovi) || 0,
+          cardId: data.cardId || Math.floor(1000 + Math.random() * 9000).toString()
+        };
+      } else if (!db[mejl]) {
+        db[mejl] = {
+          ime: ime,
+          mejl: mejl,
+          bodovi: 0,
+          cardId: Math.floor(1000 + Math.random() * 9000).toString()
+        };
+        posaljiUTabelu(db[mejl], 0);
+      }
+      setDb(db);
+      try { localStorage.setItem('sn_v4_act', mejl); } catch (e) {}
+      btn.disabled = false;
+      btn.textContent = 'Otvori moju karticu';
+      prikazi(db[mejl]);
+    })
+    .catch(function() {
+      var db = getDb();
+      if (!db[mejl]) {
+        db[mejl] = {
+          ime: ime,
+          mejl: mejl,
+          bodovi: 0,
+          cardId: Math.floor(1000 + Math.random() * 9000).toString()
+        };
+        posaljiUTabelu(db[mejl], 0);
+      }
+      setDb(db);
+      try { localStorage.setItem('sn_v4_act', mejl); } catch (e) {}
+      btn.disabled = false;
+      btn.textContent = 'Otvori moju karticu';
+      prikazi(db[mejl]);
+    });
 }
-function sacuvaj(k) {
+function sacuvaj(k, rsd) {
   var db = getDb();
   db[k.mejl] = k;
   setDb(db);
+  posaljiUTabelu(k, rsd);
   prikazi(k);
 }
 function otvoriKasir(mod) {
@@ -193,11 +202,11 @@ function potvrdiKasir() {
     var r = parseFloat(document.getElementById('k-racun').value);
     if (isNaN(r) || r <= 0) { alert('Unesite ispravan iznos racuna.'); return; }
     u.bodovi += Math.floor(r / 10);
-    sacuvaj(u);
+    sacuvaj(u, r);
     zatvoriKasir();
   } else if (kasirMod === 'popust') {
     u.bodovi -= 1000;
-    sacuvaj(u);
+    sacuvaj(u, 0);
     zatvoriKasir();
   }
 }
@@ -208,6 +217,7 @@ function prikazi(k) {
   document.getElementById('p-nalog').style.display = 'none';
   document.getElementById('banner').style.display = 'block';
   document.getElementById('p-card').style.display = 'block';
+  document.getElementById('c-id').textContent = 'ID: ' + (k.cardId || '0000');
   document.getElementById('c-ime').textContent = k.ime.toUpperCase();
   document.getElementById('c-mejl').textContent = k.mejl;
   document.getElementById('c-bodovi').textContent = k.bodovi;
@@ -220,7 +230,7 @@ function prikazi(k) {
 }
 function odjava() {
   u = null;
-  try { localStorage.removeItem('sn_v3_act'); } catch (e) {}
+  try { localStorage.removeItem('sn_v4_act'); } catch (e) {}
   document.getElementById('ime').value = '';
   document.getElementById('mejl').value = '';
   zatvoriKasir();
@@ -236,7 +246,7 @@ setInterval(updateClock, 1000);
 window.onload = function() {
   updateClock();
   try {
-    var a = localStorage.getItem('sn_v3_act');
+    var a = localStorage.getItem('sn_v4_act');
     var db = getDb();
     if (a && db[a]) prikazi(db[a]);
   } catch (e) {}
