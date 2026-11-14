@@ -37,10 +37,23 @@ input{width:100%;padding:12px;margin:6px 0 14px;border:1px solid #ccc;border-rad
 .row{padding:12px 0;border-bottom:1px solid #eee}
 .row span{display:block;font-size:0.75rem;color:#7f8c8d;text-transform:uppercase}
 footer{text-align:center;padding:15px;font-size:0.8rem;color:#666}
-.loader{text-align:center;padding:10px;font-weight:bold;color:#d9232e;display:none}
+
+/* Diskretna traka za osvežavanje u pozadini */
+.sync-status {
+  display: none;
+  background: #f1c40f;
+  color: #1a252f;
+  font-size: 0.75rem;
+  font-weight: bold;
+  text-align: center;
+  padding: 4px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+}
 </style>
 </head>
 <body>
+
 <header>
   <div><h1>TRGOVINA SNESKA 1</h1><small>Program lojalnosti</small></div>
   <button type="button" class="dots" onclick="toggleMenu(event)">...</button>
@@ -50,22 +63,23 @@ footer{text-align:center;padding:15px;font-size:0.8rem;color:#666}
     <button type="button" onclick="go('nalog')">Moj nalog</button>
   </div>
 </header>
+
 <div class="box">
+  <div class="sync-status" id="sync-status">Osvežavanje sa bazom...</div>
+  
   <div class="banner" id="banner">
     <h2>SKUPLJAJTE BODOVE SA NAMA!</h2>
     <p>Za svakih 10 RSD dobijate 1 bod. Sa 1.000 bodova ostvarujete 10% popusta!</p>
     <small>* Bodovi i popust se ne primenjuju na cigarete, novine, beli hleb i ostale snizene proizvode.</small>
   </div>
-  
-  <div class="loader" id="loader">Učitavanje sa Google Tabele...</div>
 
   <div class="card" id="p-reg">
-    <h3>Kreirajte karticu</h3>
+    <h3>Kreirajte ili otvorite karticu</h3>
     <label>Ime i prezime *</label>
     <input type="text" id="ime" placeholder="Unesite ime i prezime">
     <label>Mejl adresa *</label>
     <input type="email" id="mejl" placeholder="vas@mejl.com">
-    <button type="button" class="btn" onclick="kreiraj()">Kreiraj moju karticu</button>
+    <button type="button" class="btn" onclick="kreiraj()">Otvori / Kreiraj karticu</button>
   </div>
   
  <div class="card" id="p-card" style="display:none">
@@ -122,7 +136,7 @@ footer{text-align:center;padding:15px;font-size:0.8rem;color:#666}
     </div>
   </div>
 </div>
-<footer>Trgovina Sneska 1 | PIB: 107124984 | Cara Lazara bb | Verzija 3.2</footer>
+<footer>Trgovina Sneska 1 | PIB: 107124984 | Cara Lazara bb | Verzija 3.4</footer>
 
 <script>
 var u = null;
@@ -142,7 +156,7 @@ function toggleMenu(e) {
 
 window.onclick = function() {
   var m = document.getElementById('menu');
-  if(m) m.className = 'menu';
+  if (m) m.className = 'menu';
 };
 
 function go(s) {
@@ -168,64 +182,102 @@ function go(s) {
   }
 }
 
-function prikazLoader(prikaziUcitavanje) {
-  document.getElementById('loader').style.display = prikaziUcitavanje ? 'block' : 'none';
+function prikaziSync(prikazi) {
+  var el = document.getElementById('sync-status');
+  if (el) el.style.display = prikazi ? 'block' : 'none';
 }
 
-// Funkcija za pretragu korisnika na Google Tabeli preko mejla
-async function proveriKorisnikaNaTabeli(mejl) {
-  prikazLoader(true);
+// Lokalno čuvanje za instant otvaranje
+function lokalnoSacuvaj(k) {
+  try { localStorage.setItem('sn_v3_cache_' + k.mejl, JSON.stringify(k)); } catch(e){}
+}
+function lokalnoUcitaj(mejl) {
+  try {
+    let data = localStorage.getItem('sn_v3_cache_' + mejl.toLowerCase());
+    return data ? JSON.parse(data) : null;
+  } catch(e) { return null; }
+}
+
+// Pozadinsko osvežavanje sa tabele (ne blokira korisnika)
+async function osveziSaTabele(mejl) {
+  prikaziSync(true);
   try {
     let response = await fetch(`${API_URL}?email=${encodeURIComponent(mejl)}`);
     let res = await response.json();
-    prikazLoader(false);
+    prikaziSync(false);
     if (res.found) {
-      return {
+      let serverKorisnik = {
         id: res.id,
         ime: res.ime,
         mejl: res.mejl,
         bodovi: res.bodovi,
         ukupno_rsd: res.ukupno_rsd
       };
+      lokalnoSacuvaj(serverKorisnik);
+      // Ažuriraj ekran samo ako je korisnik i dalje na kartici
+      if (u && u.mejl.toLowerCase() === serverKorisnik.mejl.toLowerCase()) {
+        u = serverKorisnik;
+        prikazi(u);
+      }
+    }
+  } catch (err) {
+    prikaziSync(false);
+    console.error("Pozadinska sinhronizacija neuspešna", err);
+  }
+}
+
+async function proveriKorisnikaNaTabeli(mejl) {
+  // Prvo proveri da li imamo keširano lokalno da ne čekamo mrežu ako ne moramo
+  let lokalni = lokalnoUcitaj(mejl);
+  if (lokalni) {
+    // Prikazujemo lokalno odmah, a u pozadini tražimo sveže sa servera
+    osveziSaTabele(mejl);
+    return lokalni;
+  }
+
+  prikaziSync(true);
+  try {
+    let response = await fetch(`${API_URL}?email=${encodeURIComponent(mejl)}`);
+    let res = await response.json();
+    prikaziSync(false);
+    if (res.found) {
+      let k = { id: res.id, ime: res.ime, mejl: res.mejl, bodovi: res.bodovi, ukupno_rsd: res.ukupno_rsd };
+      lokalnoSacuvaj(k);
+      return k;
     }
     return null;
   } catch (err) {
-    prikazLoader(false);
-    console.error("Greška pri čitanju sa tabele:", err);
-    alert("Doшло je do greške u komunikaciji sa Google tabelom.");
+    prikaziSync(false);
+    alert("Greška u komunikaciji sa bazom.");
     return null;
   }
 }
 
-// Funkcija za registraciju novog korisnika na Google Tabeli
 async function registrujNaTabeli(noviKorisnik) {
-  prikazLoader(true);
+  prikaziSync(true);
   try {
     let response = await fetch(API_URL, {
       method: "POST",
       body: JSON.stringify({
         action: "register",
-        id_kartice: novikorisnik_id = novikorisnikId(noviKorisnik.id),
-        id_kartice:noviKorisnik.id,
+        id_kartice: noviKorisnik.id,
         ime_prezime: noviKorisnik.ime,
         mejl: noviKorisnik.mejl
       })
     });
     let res = await response.json();
-    prikazLoader(false);
+    prikaziSync(false);
     return res.success;
   } catch (err) {
-    prikazLoader(false);
-    console.error("Greška pri upisu u tabelu:", err);
+    prikaziSync(false);
     return false;
   }
 }
 
-function novikorisnikId(id) { return id; }
-
-// Funkcija za ažuriranje bodova i prometa na Google Tabeli
 async function azurirajNaTabeli(k) {
-  prikazLoader(true);
+  prikaziSync(true);
+  // Odmah čuvamo lokalno da korisnik ne čeka
+  lokalnoSacuvaj(k);
   try {
     let response = await fetch(API_URL, {
       method: "POST",
@@ -237,11 +289,10 @@ async function azurirajNaTabeli(k) {
       })
     });
     let res = await response.json();
-    prikazLoader(false);
+    prikaziSync(false);
     return res.success;
   } catch (err) {
-    prikazLoader(false);
-    console.error("Greška pri ažuriranju tabele:", err);
+    prikaziSync(false);
     return false;
   }
 }
@@ -255,13 +306,11 @@ async function kreiraj() {
     return;
   }
 
-  // Prvo proveri da li korisnik već postoji na Google Tabeli
   var postojeci = await proveriKorisnikaNaTabeli(mejl);
   
   if (postojeci) {
     u = postojeci;
   } else {
-    // Generisanje novog ID-ja (počinje od 1001 ili nastavlja)
     let zadnjiId = 1000;
     try {
       zadnjiId = parseInt(localStorage.getItem('sn_v3_last_id') || '1000', 10);
@@ -277,12 +326,12 @@ async function kreiraj() {
       ukupno_rsd: 0
     };
 
-    // Pošalji podatke na Google Tabelu
     let uspesno = await registrujNaTabeli(u);
     if (!uspesno) {
       alert("Greška: Nije uspelo upisivanje u Google tabelu.");
       return;
     }
+    lokalnoSacuvaj(u);
   }
 
   try {
@@ -294,9 +343,8 @@ async function kreiraj() {
 
 async function sacuvaj(k) {
   u = k;
-  // Ažuriraj stanje na Google tabeli
-  await azurirajNaTabeli(k);
-  prikazi(k);
+  prikazi(k); // Odmah osveži vizuelno na ekranu
+  await azurirajNaTabeli(k); // Pošalji tiho u pozadini na tabelu
 }
 
 function otvoriKasir(mod) {
@@ -379,11 +427,13 @@ window.onload = async function() {
   try {
     var a = localStorage.getItem('sn_v3_act');
     if (a) {
-      // Automatski povuci najnovije podatke sa Google Tabele kad se korisnik otvori
-      let podaciSaTabele = await proveriKorisnikaNaTabeli(a);
-      if (podaciSaTabele) {
-        prikazi(podaciSaTabele);
+      // Ako postoji u lokalnoj memoriji, prikaži ODMAH bez čekanja mreže
+      let lokalni = lokalnoUcitaj(a);
+      if (lokalni) {
+        prikazi(lokalni);
       }
+      // Sinhronizuj sveže podatke u pozadini
+      osveziSaTabele(a);
     }
   } catch (e) {
     console.error(e);
