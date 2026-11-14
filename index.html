@@ -37,6 +37,7 @@ input{width:100%;padding:12px;margin:6px 0 14px;border:1px solid #ccc;border-rad
 .row{padding:12px 0;border-bottom:1px solid #eee}
 .row span{display:block;font-size:0.75rem;color:#7f8c8d;text-transform:uppercase}
 footer{text-align:center;padding:15px;font-size:0.8rem;color:#666}
+.loader{text-align:center;padding:10px;font-weight:bold;color:#d9232e;display:none}
 </style>
 </head>
 <body>
@@ -55,6 +56,9 @@ footer{text-align:center;padding:15px;font-size:0.8rem;color:#666}
     <p>Za svakih 10 RSD dobijate 1 bod. Sa 1.000 bodova ostvarujete 10% popusta!</p>
     <small>* Bodovi i popust se ne primenjuju na cigarete, novine, beli hleb i ostale snizene proizvode.</small>
   </div>
+  
+  <div class="loader" id="loader">Učitavanje sa Google Tabele...</div>
+
   <div class="card" id="p-reg">
     <h3>Kreirajte karticu</h3>
     <label>Ime i prezime *</label>
@@ -63,6 +67,7 @@ footer{text-align:center;padding:15px;font-size:0.8rem;color:#666}
     <input type="email" id="mejl" placeholder="vas@mejl.com">
     <button type="button" class="btn" onclick="kreiraj()">Kreiraj moju karticu</button>
   </div>
+  
  <div class="card" id="p-card" style="display:none">
     <h3>Digitalna kartica</h3>
     <div class="lcard" id="card-bg">
@@ -71,7 +76,7 @@ footer{text-align:center;padding:15px;font-size:0.8rem;color:#666}
         <span style="color:#f1c40f" id="c-status">SAKUPLJANJE</span>
       </div>
       <div class="card-id">ID KARTICE: <span id="c-id">1001</span></div>
-<div class="vip-msg" id="vip-msg">MOZETE ISKORISTITI POPUST OD 10%!</div>
+      <div class="vip-msg" id="vip-msg">MOZETE ISKORISTITI POPUST OD 10%!</div>
       <div class="pts"><span id="c-bodovi">0</span> <small style="font-size:1rem">/ 1000 bod.</small></div>
       <div class="bar-bg"><div class="bar-fill" id="c-bar"></div></div>
       <div class="live-box" id="live-clock">--.--.----. --:--:--</div>
@@ -92,6 +97,7 @@ footer{text-align:center;padding:15px;font-size:0.8rem;color:#666}
     </div>
     <button type="button" class="btn btn-gray" onclick="odjava()">Promeni mejl adresu</button>
   </div>
+  
   <div class="card" id="p-firma" style="display:none">
     <h3>Trgovina Sneska</h3>
     <div class="row"><span>Naziv firme</span><strong>Trgovina Sneska 1</strong></div>
@@ -100,6 +106,7 @@ footer{text-align:center;padding:15px;font-size:0.8rem;color:#666}
     <div class="row"><span>Telefon</span><strong><a href="tel:0641329600" style="color:#27ae60">064 132 9600</a></strong></div>
     <button type="button" class="btn" onclick="go('kartica')">Nazad</button>
   </div>
+  
   <div class="card" id="p-nalog" style="display:none">
     <h3>Moj nalog</h3>
     <div id="n-da">
@@ -115,26 +122,29 @@ footer{text-align:center;padding:15px;font-size:0.8rem;color:#666}
     </div>
   </div>
 </div>
-<footer>Trgovina Sneska 1 | PIB: 107124984 | Cara Lazara bb | Verzija 3.1</footer>
+<footer>Trgovina Sneska 1 | PIB: 107124984 | Cara Lazara bb | Verzija 3.2</footer>
+
 <script>
 var u = null;
 var kasirMod = '';
+const API_URL = 'https://script.google.com/macros/s/AKfycbz3OvxA29zCJcR7suqZXDH_m1NQbCK7aqNb4zZl_Qa8w7KoWO4paSHFd-PNB8xUWaMb6A/exec';
 
-  const API_URL =
-'https://script.google.com/macros/s/AKfycbz3OvxA29zCJcR7suqZXDH_m1NQbCK7aqNb4zZl_Qa8w7KoWO4paSHFd-PNB8xUWaMb6A/exec';
-  
 function dnevniPin() {
   var d = new Date().getDate();
   return d < 10 ? '0' + d : '' + d;
 }
+
 function toggleMenu(e) {
   e.stopPropagation();
   var m = document.getElementById('menu');
   m.className = (m.className === 'menu') ? 'menu open' : 'menu';
 }
+
 window.onclick = function() {
-  document.getElementById('menu').className = 'menu';
+  var m = document.getElementById('menu');
+  if(m) m.className = 'menu';
 };
+
 function go(s) {
   document.getElementById('p-reg').style.display = 'none';
   document.getElementById('p-card').style.display = 'none';
@@ -157,46 +167,86 @@ function go(s) {
     }
   }
 }
-function getDb() {
-  try { return JSON.parse(localStorage.getItem('sn_v3_db') || '{}'); } catch (e) { return {}; }
-}
-function setDb(db) {
-  try { localStorage.setItem('sn_v3_db', JSON.stringify(db)); } catch (e) {}
+
+function prikazLoader(prikaziUcitavanje) {
+  document.getElementById('loader').style.display = prikaziUcitavanje ? 'block' : 'none';
 }
 
-// Sledeci ID se cuva u localStorage, tako da numeracija ostaje sacuvana.
-function sledeciId(db) {
-  var maxId = 1000;
-  Object.keys(db).forEach(function(key) {
-    var zapis = db[key];
-    if (zapis && Number.isFinite(Number(zapis.id))) {
-      maxId = Math.max(maxId, Number(zapis.id));
+// Funkcija za pretragu korisnika na Google Tabeli preko mejla
+async function proveriKorisnikaNaTabeli(mejl) {
+  prikazLoader(true);
+  try {
+    let response = await fetch(`${API_URL}?email=${encodeURIComponent(mejl)}`);
+    let res = await response.json();
+    prikazLoader(false);
+    if (res.found) {
+      return {
+        id: res.id,
+        ime: res.ime,
+        mejl: res.mejl,
+        bodovi: res.bodovi,
+        ukupno_rsd: res.ukupno_rsd
+      };
     }
-  });
-  var sacuvan = 1001;
-  try { sacuvan = parseInt(localStorage.getItem('sn_v3_next_id') || '1001', 10); } catch (e) {}
-  if (!Number.isFinite(sacuvan) || sacuvan < 1001) sacuvan = 1001;
-  return Math.max(1001, maxId + 1, sacuvan);
+    return null;
+  } catch (err) {
+    prikazLoader(false);
+    console.error("Greška pri čitanju sa tabele:", err);
+    alert("Doшло je do greške u komunikaciji sa Google tabelom.");
+    return null;
+  }
 }
 
-// Starim karticama dodeljuje ID samo ako ga jos nemaju.
-function dopuniIdKartice(db) {
-  var promenjeno = false;
-  Object.keys(db).forEach(function(key) {
-    if (db[key] && !db[key].id) {
-      db[key].id = sledeciId(db);
-      promenjeno = true;
-    }
-  });
-  if (promenjeno) setDb(db);
-  sacuvajSledeciId(db);
+// Funkcija za registraciju novog korisnika na Google Tabeli
+async function registrujNaTabeli(noviKorisnik) {
+  prikazLoader(true);
+  try {
+    let response = await fetch(API_URL, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "register",
+        id_kartice: novikorisnik_id = novikorisnikId(noviKorisnik.id),
+        id_kartice:noviKorisnik.id,
+        ime_prezime: noviKorisnik.ime,
+        mejl: noviKorisnik.mejl
+      })
+    });
+    let res = await response.json();
+    prikazLoader(false);
+    return res.success;
+  } catch (err) {
+    prikazLoader(false);
+    console.error("Greška pri upisu u tabelu:", err);
+    return false;
+  }
 }
 
-function sacuvajSledeciId(db) {
-  try { localStorage.setItem('sn_v3_next_id', String(sledeciId(db))); } catch (e) {}
+function novikorisnikId(id) { return id; }
+
+// Funkcija za ažuriranje bodova i prometa na Google Tabeli
+async function azurirajNaTabeli(k) {
+  prikazLoader(true);
+  try {
+    let response = await fetch(API_URL, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "update",
+        mejl: k.mejl,
+        bodovi: k.bodovi,
+        ukupno_rsd: k.ukupno_rsd || 0
+      })
+    });
+    let res = await response.json();
+    prikazLoader(false);
+    return res.success;
+  } catch (err) {
+    prikazLoader(false);
+    console.error("Greška pri ažuriranju tabele:", err);
+    return false;
+  }
 }
 
-function kreiraj() {
+async function kreiraj() {
   var ime = document.getElementById('ime').value.trim();
   var mejl = document.getElementById('mejl').value.trim().toLowerCase();
 
@@ -205,35 +255,50 @@ function kreiraj() {
     return;
   }
 
-  var db = getDb();
-  dopuniIdKartice(db);
+  // Prvo proveri da li korisnik već postoji na Google Tabeli
+  var postojeci = await proveriKorisnikaNaTabeli(mejl);
+  
+  if (postojeci) {
+    u = postojeci;
+  } else {
+    // Generisanje novog ID-ja (počinje od 1001 ili nastavlja)
+    let zadnjiId = 1000;
+    try {
+      zadnjiId = parseInt(localStorage.getItem('sn_v3_last_id') || '1000', 10);
+    } catch(e){}
+    let noviId = zadnjiId + 1;
+    localStorage.setItem('sn_v3_last_id', noviId);
 
-  if (!db[mejl]) {
-    var noviId = sledeciId(db);
-
-    db[mejl] = {
+    u = {
       id: noviId,
       ime: ime,
       mejl: mejl,
-      bodovi: 0
+      bodovi: 0,
+      ukupno_rsd: 0
     };
 
-    setDb(db);
-    sacuvajSledeciId(db);
+    // Pošalji podatke na Google Tabelu
+    let uspesno = await registrujNaTabeli(u);
+    if (!uspesno) {
+      alert("Greška: Nije uspelo upisivanje u Google tabelu.");
+      return;
+    }
   }
 
   try {
     localStorage.setItem('sn_v3_act', mejl);
   } catch (e) {}
 
-  prikazi(db[mejl]);
+  prikazi(u);
 }
-function sacuvaj(k) {
-  var db = getDb();
-  db[k.mejl] = k;
-  setDb(db);
+
+async function sacuvaj(k) {
+  u = k;
+  // Ažuriraj stanje na Google tabeli
+  await azurirajNaTabeli(k);
   prikazi(k);
 }
+
 function otvoriKasir(mod) {
   kasirMod = mod;
   document.getElementById('k-pin').value = '';
@@ -242,9 +307,11 @@ function otvoriKasir(mod) {
   document.getElementById('kasir-naslov').textContent = (mod === 'dodaj') ? 'Dodavanje bodova (Kasir)' : 'Iskoristi 10% popusta (Kasir)';
   document.getElementById('racun-polje').style.display = (mod === 'dodaj') ? 'block' : 'none';
 }
+
 function zatvoriKasir() {
   document.getElementById('kasir-panel').style.display = 'none';
 }
+
 function potvrdiKasir() {
   if (document.getElementById('k-pin').value.trim() !== dnevniPin()) {
     alert('Pogresan PIN!');
@@ -253,15 +320,24 @@ function potvrdiKasir() {
   if (kasirMod === 'dodaj') {
     var r = parseFloat(document.getElementById('k-racun').value);
     if (isNaN(r) || r <= 0) { alert('Unesite ispravan iznos racuna.'); return; }
-    u.bodovi += Math.floor(r / 10);
+    
+    let dodatiBodovi = Math.floor(r / 10);
+    u.bodovi += dodatiBodovi;
+    u.ukupno_rsd = (u.ukupno_rsd || 0) + r;
+    
     sacuvaj(u);
     zatvoriKasir();
   } else if (kasirMod === 'popust') {
+    if (u.bodovi < 1000) {
+      alert('Nemate dovoljno bodova.');
+      return;
+    }
     u.bodovi -= 1000;
     sacuvaj(u);
     zatvoriKasir();
   }
 }
+
 function prikazi(k) {
   u = k;
   document.getElementById('p-reg').style.display = 'none';
@@ -280,6 +356,7 @@ function prikazi(k) {
   document.getElementById('card-bg').className = ok ? 'lcard vip' : 'lcard';
   document.getElementById('c-status').textContent = ok ? 'VIP POPUST' : 'SAKUPLJANJE';
 }
+
 function odjava() {
   u = null;
   try { localStorage.removeItem('sn_v3_act'); } catch (e) {}
@@ -288,6 +365,7 @@ function odjava() {
   zatvoriKasir();
   go('kartica');
 }
+
 function updateClock() {
   var d = new Date();
   var p = function(n) { return n < 10 ? '0' + n : n; };
@@ -295,14 +373,21 @@ function updateClock() {
   if (el) el.textContent = 'AKTIVNO: ' + p(d.getDate()) + '.' + p(d.getMonth() + 1) + '.' + d.getFullYear() + '. ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
 }
 setInterval(updateClock, 1000);
-window.onload = function() {
+
+window.onload = async function() {
   updateClock();
   try {
     var a = localStorage.getItem('sn_v3_act');
-    var db = getDb();
-    dopuniIdKartice(db);
-    if (a && db[a]) prikazi(db[a]);
-  } catch (e) {}
+    if (a) {
+      // Automatski povuci najnovije podatke sa Google Tabele kad se korisnik otvori
+      let podaciSaTabele = await proveriKorisnikaNaTabeli(a);
+      if (podaciSaTabele) {
+        prikazi(podaciSaTabele);
+      }
+    }
+  } catch (e) {
+    console.error(e);
+  }
 };
 </script>
 </body>
