@@ -62,8 +62,7 @@ footer{text-align:center;padding:15px;font-size:0.8rem;color:#666}
     <input type="email" id="mejl" placeholder="vas@mejl.com">
     <button type="button" class="btn" onclick="kreiraj()">Kreiraj moju karticu</button>
   </div>
-
-    <div class="card" id="p-card" style="display:none">
+  <div class="card" id="p-card" style="display:none">
     <h3>Digitalna kartica</h3>
     <div class="lcard" id="card-bg">
       <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:0.85rem">
@@ -80,8 +79,8 @@ footer{text-align:center;padding:15px;font-size:0.8rem;color:#666}
     <button type="button" class="btn btn-green" onclick="otvoriKasir('dodaj')">+ Dodaj bodove (Kasir)</button>
     <div class="kasir-panel" id="kasir-panel">
       <h4 id="kasir-naslov" style="margin-bottom:10px;color:#d9232e">Unos bodova</h4>
-      <label>Dnevni PIN kasira (danasnji dan u mesecu):</label>
-      <input type="number" id="k-pin" placeholder="Unesite 2 cifre datuma">
+      <label>PIN kod kasira:</label>
+      <input type="password" inputmode="numeric" id="k-pin" placeholder="Unesite PIN">
       <div id="racun-polje">
         <label>Iznos racuna u dinarima (RSD):</label>
         <input type="number" id="k-racun" placeholder="npr. 1250">
@@ -113,7 +112,7 @@ footer{text-align:center;padding:15px;font-size:0.8rem;color:#666}
     </div>
   </div>
 </div>
-<footer>Trgovina Sneska 1 | PIB: 107124984 | Cara Lazara bb | Verzija 3.0</footer>
+<footer>Trgovina Sneska 1 | PIB: 107124984 | Cara Lazara bb | Verzija 3.1</footer>
 <script>
 var u = null;
 var kasirMod = '';
@@ -187,7 +186,7 @@ function zatvoriKasir() {
 }
 function potvrdiKasir() {
   if (document.getElementById('k-pin').value.trim() !== dnevniPin()) {
-    alert('Pogresan PIN! Unesite danasnji dan u mesecu (2 cifre).');
+    alert('Pogresan PIN!');
     return;
   }
   if (kasirMod === 'dodaj') {
