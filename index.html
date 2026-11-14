@@ -196,85 +196,36 @@ function sacuvajSledeciId(db) {
   try { localStorage.setItem('sn_v3_next_id', String(sledeciId(db))); } catch (e) {}
 }
 
-async function kreiraj() {
-
-  var ime =
-    document.getElementById('ime').value.trim();
-
-  var mejl =
-    document.getElementById('mejl').value.trim().toLowerCase();
+function kreiraj() {
+  var ime = document.getElementById('ime').value.trim();
+  var mejl = document.getElementById('mejl').value.trim().toLowerCase();
 
   if (!ime || mejl.indexOf('@') === -1) {
     alert('Unesite ime, prezime i ispravan mejl.');
     return;
   }
 
-  try {
+  var db = getDb();
+  dopuniIdKartice(db);
 
-    var odgovor =
-      await fetch(
-        API_URL +
-        '?email=' +
-        encodeURIComponent(mejl)
-      );
+  if (!db[mejl]) {
+    var noviId = sledeciId(db);
 
-    var korisnik =
-      await odgovor.json();
-
-    if (korisnik.found) {
-
-      u = {
-        id: korisnik.id,
-        ime: korisnik.ime,
-        mejl: korisnik.mejl,
-        bodovi: korisnik.bodovi
-      };
-
-      localStorage.setItem(
-        'sn_v3_act',
-        mejl
-      );
-
-      prikazi(u);
-
-      return;
-    }
-
-    var noviId = Date.now();
-
-    await fetch(API_URL, {
-      method: 'POST',
-      body: JSON.stringify({
-        action: 'register',
-        id_kartice: noviId,
-        ime_prezime: ime,
-        mejl: mejl
-      })
-    });
-
-    u = {
+    db[mejl] = {
       id: noviId,
       ime: ime,
       mejl: mejl,
       bodovi: 0
     };
 
-    localStorage.setItem(
-      'sn_v3_act',
-      mejl
-    );
-
-    prikazi(u);
-
-  } catch (e) {
-
-    console.log(e);
-
-    alert(
-      'Greška pri povezivanju sa bazom.'
-    );
+    setDb(db);
+    sacuvajSledeciId(db);
   }
-}
+
+  try {
+    localStorage.setItem('sn_v3_act', mejl);
+  } catch (e) {}
+
   prikazi(db[mejl]);
 }
 function sacuvaj(k) {
