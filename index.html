@@ -119,6 +119,10 @@ footer{text-align:center;padding:15px;font-size:0.8rem;color:#666}
 <script>
 var u = null;
 var kasirMod = '';
+
+  const API_URL =
+'https://script.google.com/macros/s/AKfycbz3OvxA29zCJcR7suqZXDH_m1NQbCK7aqNb4zZl_Qa8w7KoWO4paSHFd-PNB8xUWaMb6A/exec';
+  
 function dnevniPin() {
   var d = new Date().getDate();
   return d < 10 ? '0' + d : '' + d;
@@ -192,19 +196,85 @@ function sacuvajSledeciId(db) {
   try { localStorage.setItem('sn_v3_next_id', String(sledeciId(db))); } catch (e) {}
 }
 
-function kreiraj() {
-  var ime = document.getElementById('ime').value.trim();
-  var mejl = document.getElementById('mejl').value.trim().toLowerCase();
-  if (!ime || mejl.indexOf('@') === -1) { alert('Unesite ime, prezime i ispravan mejl.'); return; }
-  var db = getDb();
-  dopuniIdKartice(db);
-  if (!db[mejl]) {
-    var noviId = sledeciId(db);
-    db[mejl] = { id: noviId, ime: ime, mejl: mejl, bodovi: 0 };
-    setDb(db);
-    sacuvajSledeciId(db);
+async function kreiraj() {
+
+  var ime =
+    document.getElementById('ime').value.trim();
+
+  var mejl =
+    document.getElementById('mejl').value.trim().toLowerCase();
+
+  if (!ime || mejl.indexOf('@') === -1) {
+    alert('Unesite ime, prezime i ispravan mejl.');
+    return;
   }
-  try { localStorage.setItem('sn_v3_act', mejl); } catch (e) {}
+
+  try {
+
+    var odgovor =
+      await fetch(
+        API_URL +
+        '?email=' +
+        encodeURIComponent(mejl)
+      );
+
+    var korisnik =
+      await odgovor.json();
+
+    if (korisnik.found) {
+
+      u = {
+        id: korisnik.id,
+        ime: korisnik.ime,
+        mejl: korisnik.mejl,
+        bodovi: korisnik.bodovi
+      };
+
+      localStorage.setItem(
+        'sn_v3_act',
+        mejl
+      );
+
+      prikazi(u);
+
+      return;
+    }
+
+    var noviId = Date.now();
+
+    await fetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'register',
+        id_kartice: noviId,
+        ime_prezime: ime,
+        mejl: mejl
+      })
+    });
+
+    u = {
+      id: noviId,
+      ime: ime,
+      mejl: mejl,
+      bodovi: 0
+    };
+
+    localStorage.setItem(
+      'sn_v3_act',
+      mejl
+    );
+
+    prikazi(u);
+
+  } catch (e) {
+
+    console.log(e);
+
+    alert(
+      'Greška pri povezivanju sa bazom.'
+    );
+  }
+}
   prikazi(db[mejl]);
 }
 function sacuvaj(k) {
