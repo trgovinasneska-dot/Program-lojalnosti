@@ -114,7 +114,6 @@ footer{text-align:center;padding:15px;font-size:0.8rem;color:#666}
   </div>
   <div class="card" id="p-firma" style="display:none">
     <h3 id="t-fir-h3">Budimo u kontaktu</h3>
-    <!-- Slika preko direktnog Facebook linka -->
     <img src="https://scontent.fbeg5-1.fna.fbcdn.net/v/t39.30808-6/906606475_1664324232147139_5039905750028739665_n.avif?stp=dst-jpg_tt6&cstp=mx2921x937&ctp=s2921x937&_nc_cat=111&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=cc71e4&_nc_eui2=AeGq27lwVUUkYVqCA7Ye5Z9Q7pjyXKK6rLnumPJcorqsuYjTZoWcGlZCqCBLiwvdDUkvJZFax2iNe-WLIt9Jq9da&_nc_ohc=xj3gzH6j2CsQ7kNvwEIdtvj&_nc_oc=AdpwRKnGjenlpWzgJaxhLnt0NF2N0G7_9QdpgtEy1I6_9KF1YrpYdGXnT-Q_6iLntVI&_nc_zt=23&_nc_ht=scontent.fbeg5-1.fna&_nc_gid=Z6d03g9WBMJXizPJfaRT1A&_nc_ss=7b2a8&oh=00_AQRx8XVkgEvOa8xb5IX5RbgwSycIRjD81Kh9Upz1wl85LA&oe=6AFEB1BA" alt="Trgovina Sneska 1" class="store-img">
     
     <div class="row"><span id="t-fir-s1">Naziv firme</span><strong id="t-fir-v1">Trgovina Sneska 1</strong></div>
@@ -377,41 +376,26 @@ function go(s) {
     }
   }
 }
-function getDb() {
-  try { return JSON.parse(localStorage.getItem('sn_v3_db') || '{}'); } catch (e) { return {}; }
-}
-function setDb(db) {
-  try { localStorage.setItem('sn_v3_db', JSON.stringify(db)); } catch (e) {}
-}
 
-function sledeciId(db) {
-  var maxId = 1000;
-  Object.keys(db).forEach(function(key) {
-    var zapis = db[key];
-    if (zapis && Number.isFinite(Number(zapis.id))) {
-      maxId = Math.max(maxId, Number(zapis.id));
-    }
+// API Komunikacija sa Google tabelom
+function apiPoziv(podaci, callback) {
+  fetch(API_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(podaci)
+  }).then(function() {
+    if (callback) callback();
+  }).catch(function(err) {
+    console.error('API Greska:', err);
   });
-  var sacuvan = 1001;
-  try { sacuvan = parseInt(localStorage.getItem('sn_v3_next_id') || '1001', 10); } catch (e) {}
-  if (!Number.isFinite(sacuvan) || sacuvan < 1001) sacuvan = 1001;
-  return Math.max(1001, maxId + 1, sacuvan);
 }
 
-function dopuniIdKartice(db) {
-  var promenjeno = false;
-  Object.keys(db).forEach(function(key) {
-    if (db[key] && !db[key].id) {
-      db[key].id = sledeciId(db);
-      promenjeno = true;
-    }
-  });
-  if (promenjeno) setDb(db);
-  sacuvajSledeciId(db);
-}
-
-function sacuvajSledeciId(db) {
-  try { localStorage.setItem('sn_v3_next_id', String(sledeciId(db))); } catch (e) {}
+function proveriKorisnikaNaServeru(mejl, callback) {
+  fetch(API_URL + '?mejl=' + encodeURIComponent(mejl))
+    .then(function(res) { return res.json(); })
+    .then(function(data) { callback(data); })
+    .catch(function() { callback(null); });
 }
 
 function kreiraj() {
@@ -424,35 +408,69 @@ function kreiraj() {
     return;
   }
 
-  var db = getDb();
-  dopuniIdKartice(db);
+  // Lokalno čuvanje
+  var db = tryGetDb();
+  var id = 1001;
+  var bodovi = 0;
+  var ukupnoRsd = 0;
 
-  if (!db[mejl]) {
-    var noviId = sledeciId(db);
-
-    db[mejl] = {
-      id: noviId,
-      ime: ime,
-      mejl: mejl,
-      bodovi: 0
-    };
-
-    setDb(db);
-    sacuvajSledeciId(db);
+  var keys = Object.keys(db);
+  if (keys.length > 0) {
+    var maxId = 1001;
+    keys.forEach(function(k) {
+      if (db[k].id && db[k].id > maxId) maxId = db[k].id;
+    });
+    id = maxId + 1;
   }
 
-  try {
-    localStorage.setItem('sn_v3_act', mejl);
-  } catch (e) {}
+  if (db[mejl]) {
+    id = db[mejl].id;
+    bodovi = db[mejl].bodovi;
+    ukupnoRsd = db[mejl].ukupnoRsd || 0;
+  }
 
-  prikazi(db[mejl]);
+  u = { id: id, ime: ime, mejl: mejl, bodovi: bodovi, ukupnoRsd: ukupnoRsd };
+  db[mejl] = u;
+  trySetDb(db);
+
+  try { localStorage.setItem('sn_v3_act', mejl); } catch (e) {}
+
+  // Slanje u Google tabelu
+  apiPoziv({
+    akcija: 'kreiraj',
+    id: id,
+    ime: ime,
+    mejl: mejl,
+    bodovi: bodovi,
+    ukupnoRsd: ukupnoRsd
+  });
+
+  prikazi(u);
 }
+
 function sacuvaj(k) {
-  var db = getDb();
+  var db = tryGetDb();
   db[k.mejl] = k;
-  setDb(db);
+  trySetDb(db);
   prikazi(k);
+
+  apiPoziv({
+    akcija: 'azuriraj',
+    id: k.id,
+    ime: k.ime,
+    mejl: k.mejl,
+    bodovi: k.bodovi,
+    ukupnoRsd: k.ukupnoRsd || 0
+  });
 }
+
+function tryGetDb() {
+  try { return JSON.parse(localStorage.getItem('sn_v3_db') || '{}'); } catch (e) { return {}; }
+}
+function trySetDb(db) {
+  try { localStorage.setItem('sn_v3_db', JSON.stringify(db)); } catch (e) {}
+}
+
 function otvoriKasir(mod) {
   var t = TEKSTOVI[pismo];
   kasirMod = mod;
@@ -475,6 +493,7 @@ function potvrdiKasir() {
     var r = parseFloat(document.getElementById('k-racun').value);
     if (isNaN(r) || r <= 0) { alert(t.alertRacun); return; }
     u.bodovi += Math.floor(r / 10);
+    u.ukupnoRsd = (u.ukupnoRsd || 0) + r;
     sacuvaj(u);
     zatvoriKasir();
   } else if (kasirMod === 'popust') {
@@ -528,9 +547,10 @@ window.onload = function() {
   primeniPismo();
   try {
     var a = localStorage.getItem('sn_v3_act');
-    var db = getDb();
-    dopuniIdKartice(db);
-    if (a && db[a]) prikazi(db[a]);
+    var db = tryGetDb();
+    if (a && db[a]) {
+      prikazi(db[a]);
+    }
   } catch (e) {}
 };
 </script>
