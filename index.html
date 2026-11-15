@@ -377,12 +377,12 @@ function go(s) {
   }
 }
 
-// API Komunikacija sa Google tabelom
-function apiPoziv(podaci, callback) {
+// Funkcija za slanje podataka na Google Apps Script (POST)
+function posaljiNaServer(podaci, callback) {
   fetch(API_URL, {
     method: 'POST',
     mode: 'no-cors',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify(podaci)
   }).then(function() {
     if (callback) callback();
@@ -391,8 +391,9 @@ function apiPoziv(podaci, callback) {
   });
 }
 
-function proveriKorisnikaNaServeru(mejl, callback) {
-  fetch(API_URL + '?mejl=' + encodeURIComponent(mejl))
+// Provera korisnika na serveru preko mejla (GET)
+function proveriServer(mejl, callback) {
+  fetch(API_URL + '?email=' + encodeURIComponent(mejl))
     .then(function(res) { return res.json(); })
     .then(function(data) { callback(data); })
     .catch(function() { callback(null); });
@@ -408,67 +409,73 @@ function kreiraj() {
     return;
   }
 
-  // Lokalno čuvanje
-  var db = tryGetDb();
-  var id = 1001;
-  var bodovi = 0;
-  var ukupnoRsd = 0;
+  // Prvo proveravamo da li korisnik već postoji na serveru u tabeli
+  proveriServer(mejl, function(res) {
+    if (res && res.found) {
+      // Korisnik već postoji u tabeli, preuzmi njegove podatke
+      u = {
+        id: res.id,
+        ime: res.ime,
+        mejl: res.mejl,
+        bodovi: res.bodovi,
+        ukupno_rsd: res.ukupno_rsd
+      };
+      saveLocal(u);
+      prikazi(u);
+    } else {
+      // Novi korisnik - generišemo ID i šaljemo akciju "register" u tabelu
+      var db = getLocalDb();
+      var maxId = 1000;
+      Object.keys(db).forEach(function(k) {
+        if (db[k].id && db[k].id > maxId) maxId = db[k].id;
+      });
+      var id = maxId + 1;
 
-  var keys = Object.keys(db);
-  if (keys.length > 0) {
-    var maxId = 1001;
-    keys.forEach(function(k) {
-      if (db[k].id && db[k].id > maxId) maxId = db[k].id;
-    });
-    id = maxId + 1;
-  }
+      u = {
+        id: id,
+        ime: ime,
+        mejl: mejl,
+        bodovi: 0,
+        ukupno_rsd: 0
+      };
 
-  if (db[mejl]) {
-    id = db[mejl].id;
-    bodovi = db[mejl].bodovi;
-    ukupnoRsd = db[mejl].ukupnoRsd || 0;
-  }
+      saveLocal(u);
 
-  u = { id: id, ime: ime, mejl: mejl, bodovi: bodovi, ukupnoRsd: ukupnoRsd };
-  db[mejl] = u;
-  trySetDb(db);
+      // Šaljemo tačno parametre koje Apps Script doPost(e) očekuje za "register"
+      posaljiNaServer({
+        action: 'register',
+        id_kartice: id,
+        ime_prezime: ime,
+        mejl: mejl
+      });
 
-  try { localStorage.setItem('sn_v3_act', mejl); } catch (e) {}
-
-  // Slanje u Google tabelu
-  apiPoziv({
-    akcija: 'kreiraj',
-    id: id,
-    ime: ime,
-    mejl: mejl,
-    bodovi: bodovi,
-    ukupnoRsd: ukupnoRsd
+      prikazi(u);
+    }
   });
-
-  prikazi(u);
 }
 
-function sacuvaj(k) {
-  var db = tryGetDb();
+function saveLocal(k) {
+  var db = getLocalDb();
   db[k.mejl] = k;
-  trySetDb(db);
-  prikazi(k);
-
-  apiPoziv({
-    akcija: 'azuriraj',
-    id: k.id,
-    ime: k.ime,
-    mejl: k.mejl,
-    bodovi: k.bodovi,
-    ukupnoRsd: k.ukupnoRsd || 0
-  });
+  try { localStorage.setItem('sn_v3_db', JSON.stringify(db)); } catch (e) {}
+  try { localStorage.setItem('sn_v3_act', k.mejl); } catch (e) {}
 }
 
-function tryGetDb() {
+function getLocalDb() {
   try { return JSON.parse(localStorage.getItem('sn_v3_db') || '{}'); } catch (e) { return {}; }
 }
-function trySetDb(db) {
-  try { localStorage.setItem('sn_v3_db', JSON.stringify(db)); } catch (e) {}
+
+function azurirajNaServeru(k) {
+  saveLocal(k);
+  prikazi(k);
+
+  // Šaljemo tačno parametre koje Apps Script doPost(e) očekuje za "update"
+  posaljiNaServer({
+    action: 'update',
+    mejl: k.mejl,
+    bodovi: k.bodovi,
+    ukupno_rsd: k.ukupno_rsd || 0
+  });
 }
 
 function otvoriKasir(mod) {
@@ -493,12 +500,12 @@ function potvrdiKasir() {
     var r = parseFloat(document.getElementById('k-racun').value);
     if (isNaN(r) || r <= 0) { alert(t.alertRacun); return; }
     u.bodovi += Math.floor(r / 10);
-    u.ukupnoRsd = (u.ukupnoRsd || 0) + r;
-    sacuvaj(u);
+    u.ukupno_rsd = (u.ukupno_rsd || 0) + r;
+    azurirajNaServeru(u);
     zatvoriKasir();
   } else if (kasirMod === 'popust') {
     u.bodovi -= 1000;
-    sacuvaj(u);
+    azurirajNaServeru(u);
     zatvoriKasir();
   }
 }
@@ -547,9 +554,19 @@ window.onload = function() {
   primeniPismo();
   try {
     var a = localStorage.getItem('sn_v3_act');
-    var db = tryGetDb();
+    var db = getLocalDb();
     if (a && db[a]) {
-      prikazi(db[a]);
+      u = db[a];
+      prikazi(u);
+      // Osveži podatke i sa servera u pozadini
+      proveriServer(u.mejl, function(res) {
+        if (res && res.found) {
+          u.bodovi = res.bodovi;
+          u.ukupno_rsd = res.ukupno_rsd;
+          saveLocal(u);
+          prikazi(u);
+        }
+      });
     }
   } catch (e) {}
 };
